@@ -1,0 +1,49 @@
+name: Unlock Mailer（管理后台解锁验证码投递）
+
+on:
+  repository_dispatch:
+    types: [unlock-code]
+
+concurrency:
+  group: unlock-mailer
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 校验载荷
+        env:
+          CODE: ${{ github.event.client_payload.code }}
+          EMAIL: ${{ github.event.client_payload.email }}
+        run: |
+          if [ -z "$CODE" ] || ! [[ "$CODE" =~ ^[0-9]{6}$ ]]; then
+            echo "::error::载荷校验失败：code 必须为 6 位数字"
+            exit 1
+          fi
+          if [ "$EMAIL" != "3423419394@qq.com" ]; then
+            echo "::error::载荷校验失败：收件邮箱不匹配（仅投递固定邮箱）"
+            exit 1
+          fi
+
+      - name: 发送验证码邮件（QQ 邮箱 SMTP）
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.qq.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USER }}
+          password: ${{ secrets.MAIL_AUTH_CODE }}
+          subject: 【墨影书城】管理后台解锁验证码
+          to: 3423419394@qq.com
+          from: ${{ secrets.MAIL_USER }}
+          body: |
+            您的管理后台解锁验证码为：${{ github.event.client_payload.code }}
+
+            - 验证码 10 分钟内有效
+            - 若非本人操作，请忽略本邮件
+            - 本邮件由系统自动发送（真人收码解锁）
+          priority: high
